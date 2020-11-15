@@ -1,0 +1,181 @@
+<!-- JUMP COLLECT STAR GAME - USE ARROW KEYS TO PLAY -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.24.1/phaser.js" crossorigin="true"></script>
+    <title>Document</title>
+    <style>
+        html, body{
+            margin: 0px;    padding: 0px;
+        }
+    </style>
+</head>
+<body>
+    <script type="text/javascript">
+        // game config => configuration
+        const config = {
+            // gaming engine=> WebGl,Canvas
+            // WEBGL => Pure Gaming Engine
+            // Canvas=> draw anything in browser
+            type: Phaser.AUTO,
+            width: 800,
+            height: 600,
+            physics: {
+                default: "arcade",
+                arcade: {
+                    gravity: {
+                        y: 300
+                    }
+                }
+
+            }, scene: {
+                // assets that would used later in the game
+                preload: preload,   // mechanism
+                // initialize 
+                create: setup,  // visible area
+                // update
+                update: update  //working
+            }
+        }
+        let platform, player, cursor, stars, score = 0, scoreText, bombs, gameOver = false, highscore=0, hstext;
+        function preload() {    
+            this.load.image("sky", "assets/sky.png");   //this == game
+            this.load.image("platform", "assets/platform.png");
+            this.load.spritesheet("hero", "assets/player.png", {
+                frameWidth: 32,
+                frameHeight: 48
+            });
+            this.load.image("star", "assets/star.png");
+            this.load.audioSprite("sfx", "assets/fx_mixdown.json", ["assets/fx_mixdown.mp3", "assets/fx_mixdown.ogg"]);
+            this.load.image("bomb", "assets/bomb.png");
+            this.load.image("arrow","assets/arrow.png");
+            this.load.image("gameover","assets/gameover.png");
+        }
+        function setup() {
+            // to add background
+            this.add.image(400, 300, "sky");    //center cordinate - center area che image chhap di
+            // to make an asset static=> no effect of gravity
+            platform = this.physics.add.staticGroup();  
+            platform.create(400, 550, "platform").setScale(2).refreshBody();  //refresh jroori for the object to know about the scaling 
+            platform.create(600, 400, "platform");
+            platform.create(50, 250, "platform");
+            platform.create(650, 200, "platform");
+            this.add.image(660,500,"arrow").setScale(0.2).setAlpha(0.2);    //setScale == size; setAlpha == transparency
+            player = this.physics.add.sprite(400, 100, "hero"); 
+            // to create cursor keys
+            // for animation
+            bombs = this.physics.add.group();
+            let bomb = bombs.create(400, 0, "bomb");
+            bomb.setBounce(1);  //bouncing speed
+            bomb.setCollideWorldBounds(true); //screen ton bahr ni janda
+            bomb.setVelocity(Phaser.Math.Between(-200, 200), 20);   // ((x, kitni speed mein x move), y)
+            cursor = this.input.keyboard.createCursorKeys();    // up down left right integrate
+            stars = this.physics.add.group({
+                key: "star",
+                repeat: 10,
+                setXY: { x: 50, y: 0, stepX: 70 }   //pehle waale ka x, y (50, 0). Stepx = har star ke beech ki doori. 
+            })
+            let game = this;
+            this.physics.add.collider(player, platform);
+            // let boundFn = collectStar.bind(this);
+            this.physics.add.collider(player, stars, collectStar, null, this);
+            this.physics.add.collider(platform, stars);
+            this.physics.add.collider(platform, bombs);
+            this.physics.add.collider(player, bombs, hitBomb.bind(this));
+            // you can add text to phas
+            scoreText = this.add.text(16, 16, "score:0", {
+                fontSize: "32px",
+                fill: "white"
+            })
+            hstext = this.add.text(500, 16, "High Score: " + highscore, {
+            fontSize: "32px",
+            fill: "white"
+        })
+            player.setCollideWorldBounds(true);
+
+            stars.children.iterate(function (star) {
+                star.setBounceY(Phaser.Math.FloatBetween(0.4, 0.8)) //Adding random bounce 
+            });
+            //Animation
+            this.anims.create({
+                key: "left",
+                frames: this.anims.generateFrameNumbers("hero", { start: 0, end: 3 }),
+                frameRate: 10,  //10 ms ki speed pe change
+                repeat: +1  //+1, -1, 0 [repeat coz 4 frames che khatm a loop islai repaet the cycle]
+            })
+            this.anims.create({
+                key: "right",
+                frames: this.anims.generateFrameNumbers("hero", { start: 5, end: 9 }),
+                frameRate: 10,
+                repeat: +1
+            })
+            this.anims.create({
+                key: "normal",
+                frames: this.anims.generateFrameNumbers("hero", { start: 4, end: 4 }),
+                frameRate: 10
+            })
+        }
+        function collectStar(player, star) {
+            star.disableBody(true, true);   //1st param = move hona band hota, 2nd para = dikhna band hota
+            this.sound.playAudioSprite("sfx", "ping");
+            score += 10;
+            scoreText.setText("Score: " + score);
+            if (score % 100 == 0) {
+                stars.children.iterate(function (child) {
+                    child.enableBody(true, child.x, 0, true, true); //asking for stars after all collected
+                })
+                let x = player.x < 400 ? Phaser.Math.Between(400, 800) : Phaser.Math.Between(0, 400);   //bomb ko bnde ki opposite side pe mangwao
+                let bomb = bombs.create(x, 0, "bomb");
+                bomb.setBounce(1);
+                bomb.setCollideWorldBounds(true);
+                bomb.setVelocity(Phaser.Math.Between(-200, 200), 20);
+            }
+        }
+        function hitBomb() {
+            this.sound.playAudioSprite("sfx", "alien death");
+            this.physics.pause();
+            player.setTint(0xff0000); //color change
+            player.anims.play("normal");    //move na kr paye bilkul bhi
+            gameOver = true
+            this.add.image(400,300,"gameover");
+            // location.reload();   //browser refersh
+        }
+        function update() {
+            if(gameOver==true){
+                // return;      
+                this.registry.destroy(); // destroy registry
+                this.events.off();// disable all active events
+                gameOver=false;
+                highscore = score>highscore?score:highscore;
+                hstext.setText("High Score: "+highscore);
+                score=0;
+                setTimeout(() => {
+                    this.scene.restart(); // restart current scene
+                }, 500);
+            }
+            if (cursor.left.isDown) {
+                player.setVelocityX(-160);
+                player.anims.play("left", true);
+                // this.sound.playAudioSprite("sfx", "numkey");
+
+            } else if (cursor.right.isDown) {
+                player.setVelocityX(160);
+                player.anims.play("right", true);
+                // this.sound.playAudioSprite("sfx", "numkey");
+            } else {
+                player.setVelocityX(0);
+                player.anims.play("normal");
+            }
+            // Vertical Jump
+            if (cursor.up.isDown && player.body.touching.down) {
+                player.setVelocityY(-480);
+
+                this.sound.playAudioSprite("sfx", "numkey");
+            }
+        }
+        new Phaser.Game(config);
+    </script>
+</body>
+</html>
